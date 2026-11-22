@@ -1,3 +1,32 @@
+## Barist.8 — flagship: fine-tuned multilingual-e5-small encoder (released; git tag `barist-8`, HF `KucLab/Barist.8`)
+
+Architecture change: the from-scratch 903K transformer is replaced by a fine-tuned
+`intfloat/multilingual-e5-small` encoder (118M) + binary softmax head + 15-label
+sigmoid category head (OpenAI-style: sexual, sexual_minors, harassment(+threatening),
+hate(+threatening), self_harm(+intent/+instructions), violence(+graphic),
+illicit(+violent), grooming, jailbreak_injection). Training: `scripts/finetune_e5.py`,
+269k rows, checkpoints b8e (2 epochs from base) -> b8f (+325 curated counter-pair rows:
+grooming/OTP/bullying/CSAM lines + roleplay/idiom/food benign twins) -> b8g (weight soup
+of b8e+b8f) -> b8h (gentle round on weighted benign pairs) -> b8i (soup of b8g+b8h, SHIPPED). The fine-tuned
+encoder itself is saved in the bundle (plain `transformers` loads it); inference via
+`kuclab/hf_model.py` `HFShield` + regex safety net (`kuclab/langdetect.py`).
+
+Gates (`scripts/eval_gates_hf.py` -> `reports/gates_hf.json`, tag Barist.8, checkpoint b8i — soup of b8e+b8f and b8g+b8h):
+heldout2 model-only 73/75 (+prefilter 73/75, benign FP 2/16; Barist.7: 53/75, 5/16);
+heldout3 model-only 47/50 (Barist.7: 34/50); heldout4 (new, curated 46 unsafe/96 benign,
+0 train overlap) model-only 30/46, +prefilter 32/46, benign FP 4/96;
+test F1 0.8849 / P 0.9012 / R 0.8692 (Barist.7: 0.822); cs_benign FPR 0.43 % (was ~7 %);
+user benign FP 2/43 (known idiom FPs, listed in README); identity FP 0.0, identity
+recall 0.958 (Barist.7: 22.7 % / 0.625); cat_recall sexual_minors 0.75, self_harm 0.57
+(regex-carried classes). ONNX parity max |dp| = 1e-6; CPU latency 5.3 ms/text
+(`bundle bench.json`). New regex layer: strong grooming indicators -> must_catch
+grooming; mild grooming + OTP/phishing asks -> needs_review; regex gate 0 hard FP on
+522 benign + all heldout benign rows.
+
+Known limitations (published): single-text model — multi-turn grooming sequences need
+conversation context (out of scope); 4 idiom FPs on the reviewer's benign set;
+no OpenAI API baseline in this environment (no key) — documented in README. 2 known idiom FPs remain on the reviewer benign set.
+
 ## Barist.7 — tenth adversarial review (checkpoint `checkpoints_b7b/best.pt`)
 
 - Czech CSAM regex parity: acquisition verbs (vidět/ukázat/najdu/sehnat/odkaz…) + `nah\w*|sexy|bez oceries` + `hol(e)?k\w* do N let` + flexible `telegram.{0,40}(detsk\w*|cp\w*|nah\w*|porn\w*|csam|material\w*)`. All reported leaks block: "Chci vidět nahé děti", telegram dětský materiál, "sexy fotky holek do 12 let".

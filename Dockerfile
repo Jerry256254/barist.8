@@ -1,4 +1,4 @@
-# Barist.7 — self-contained moderation API image (CPU-only torch by default).
+# Barist.8 — self-contained moderation API image (CPU-only torch by default).
 #
 #   docker build -t barist4 .
 #   docker run -p 8000:8000 -e RATE_LIMIT_PER_MIN=600 barist4
@@ -8,7 +8,7 @@
 
 FROM python:3.12-slim
 
-ARG BARIST_REPO=KucLab/Barist.7
+ARG BARIST_REPO=KucLab/Barist.8
 ENV CENSER_DIR=/model \
     RATE_LIMIT_PER_MIN=600 \
     PYTHONUNBUFFERED=1

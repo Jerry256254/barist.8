@@ -1,4 +1,4 @@
-"""Batch classification API for the Barist.7 Hub bundle (stdlib only, no FastAPI).
+"""Batch classification API for the Barist.8 Hub bundle (stdlib only, no FastAPI).
 
     python serve.py --port 8000                   # serves the local HF bundle dir (run from the bundle root)
     CENSER_DIR=/path/to/bundle python scripts/serve.py
@@ -108,12 +108,29 @@ def main() -> None:
     import sys
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from censer import CenserPipeline
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    if (Path(args.dir) / "shield_config.json").exists():
+        from kuclab.hf_model import HFShield
 
-    pipe = CenserPipeline(args.dir, device=args.device)
+        class ShieldPipe:
+            def __init__(self, d, device=None):
+                self.sh = HFShield(d, device=device)
+                self.device = self.sh.device
+
+            def predict(self, text):
+                return self.sh.predict(text)
+
+            def predict_batch(self, texts):
+                return [self.sh.predict(t) for t in texts]
+
+        pipe = ShieldPipe(args.dir, device=args.device)
+    else:
+        from censer import CenserPipeline
+
+        pipe = CenserPipeline(args.dir, device=args.device)
     limiter = RateLimiter(float(os.environ.get("RATE_LIMIT_PER_MIN", "600")))
     server = ThreadingHTTPServer((args.host, args.port), make_handler(pipe, limiter, args.dir))
-    print(f"barist.7 serve: model={args.dir} device={pipe.device} on http://{args.host}:{args.port}")
+    print(f"barist.8 serve: model={args.dir} device={pipe.device} on http://{args.host}:{args.port}")
     print("  POST /classify {\"texts\": [...]}   POST /classify-one {\"text\": ...}   GET /health")
     server.serve_forever()
 

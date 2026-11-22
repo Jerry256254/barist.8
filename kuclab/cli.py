@@ -245,3 +245,57 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def ui_main_b8(argv: list[str] | None = None) -> int:
+    """Entry point for the `barist.8` command (HFShield: e5-small encoder + heads)."""
+    parser = argparse.ArgumentParser(
+        prog="barist.8",
+        description="Barist.8 terminal UI: classify text as safe/unsafe (+ 15 categories). "
+        "Run without arguments for the interactive UI.",
+    )
+    parser.add_argument("text", nargs="*", help="phrase to classify once; omit to open the interactive UI")
+    parser.add_argument("--repo", default="KucLab/Barist.8", help="Hub repo id of the model")
+    parser.add_argument("--model-dir", default=None, help="local Barist.8 bundle dir (shield_config.json) instead of the Hub")
+    parser.add_argument("--device", default=None, help="cuda / cpu (default: auto)")
+    parser.add_argument("--json", action="store_true", help="one-shot JSON output")
+    args = parser.parse_args(argv)
+
+    from .hf_model import HFShield
+
+    if args.model_dir:
+        sh = HFShield(args.model_dir, device=args.device)
+        source = f"{args.model_dir} ({sh.device})"
+    else:
+        from huggingface_hub import snapshot_download
+        print(f"loading {args.repo} ...", file=sys.stderr)
+        d = snapshot_download(args.repo)
+        sh = HFShield(d, device=args.device)
+        source = f"{args.repo} ({sh.device})"
+
+    def predict(text: str):
+        v = sh.predict(text)
+        return (v["label"], v["score"], v.get("categories") or [], v.get("override"),
+                v.get("needs_support"), bool(v.get("needs_review")))
+
+    text = " ".join(args.text).strip()
+    if text:
+        label, prob, cats, override, support, review = predict(text)
+        if args.json:
+            print(json.dumps({"label": label, "unsafe": label == "unsafe", "score": prob,
+                              **({"categories": cats} if cats else {}),
+                              **({"override": override} if override else {}),
+                              **({"needs_support": support} if support else {}),
+                              **({"needs_review": True} if review else {})}))
+        else:
+            colored = _color(f"{label:6s}", "31" if label == "unsafe" else "32")
+            extra = f"  [{', '.join(cats)}]" if cats else ""
+            if override:
+                extra += f"  (override: {override})"
+            if support:
+                extra += f"  (needs_support: {support})"
+            if review:
+                extra += "  (needs_review)"
+            print(f"{colored} {prob:.4f}{extra}")
+        return 0
+    return run_ui(predict, source)

@@ -131,6 +131,8 @@ _MC_BOMB_BENIGN = _rx(r"(pyrotechnik|silvestr|ohňostroj|prskavk|dort|do koupele
 _MC_HELP_OTHER = _rx(r"\b(pomoct|pomoc|pomoz\w*|podpora|pece|help|support|prevence)\b(?!.*\b(mi|me)\s+(pomo\w*|help|support))")
 _MC_POISON_3P = _rx(r"otr\w*vit (souseda|manzelku|manzela|nekdoho|psa|kocku|zvir(e|ě)|cloveka|kdokoli|obet|dite|deti)")
 # Barist.6: poison aimed at a PERSON via a hidden target ("jed na krysy pro tchyni")
+_MC_GROOM_STRONG = _rx(r"(tell me your (home )?address|where do you live\?|what'?s your (home )?address|meet up alone|we can meet alone|let'?s meet (up )?alone|send (a |ur |me a )?(nude|naked) ?(pic|photo|selfie)|send your locker pic|hide your age|you look (so |really |)young|you look mature|are you home alone|are your parents (home|away)|what is your school|what school do you (go to|attend)|which school do you attend|kolik (ti je|je ti)( let)?|kde (přesně )?bydlíš|kde chodíš do školy|jakou máš školu|pojďme se potkat|neříkej to (nikomu|rodičům)|jsi (sám|sama) doma|budeme to tajit|pošli (mi )?selfie)")
+_MC_GROOM_MILD = _rx(r"(how old are you|are you (under )?18|do you like me|don'?t tell anyone|don'?t post this chat|keep (this|our chat|it) (between us|secret)|stay awake and text me|don'?t tell your parents|what'?s your snap|are you 18 yet)")
 _MC_POISON_PERSON = _rx(r"(jed|otrava|otrav\w*|recept na jed|prasky|prášky).{0,40}(pro|na|proti) (tchyn\w*|manzel\w*|manzelku|souseda|souseda|zenu|ženu|rodinu|dite|dítě| dite)")
 # Barist.6: 2nd/3rd-person kill targets ignore news/media context ("Jak zabít souseda, je to do knihy")
 _MC_KILL_3P = _rx(r"((zab\w{1,10}|how to kill|jak zab\w{1,10}) (my |the )?(souseda|manzelku|manzela|nekdoho|kdokoli|cloveka|obet|obět|zenu|ženu|muze|muže|rodinu|neighbor|wife|husband|boss|sefa|šefa|ucitele|učitele|teacher|spoluzaka|spolužáka|classmate|mamu|mámu|mom|mother|tatku|tátu|dad|father|brachu|bráchu|brother)"
@@ -203,6 +205,8 @@ def must_catch_hit(text: str) -> list[str]:
         hits.append("hate_harassment")
     if _MC_HATE_STEREO.search(folded) and not news:
         hits.append("hate_harassment")
+    if _MC_GROOM_STRONG.search(folded) and not news and not support:
+        hits.append("grooming")
     legal = bool(_MC_LEGAL_WEAPON.search(folded))
     bomb_benign = bool(_MC_BOMB_BENIGN.search(folded))
     pest = bool(_MC_PEST.search(folded))
@@ -245,6 +249,10 @@ def review_hit(text: str) -> list[str]:
         out.append("weapons_explosives")
     if _MC_BOMB_BENIGN.search(folded) and _MC_MARKET.search(folded):
         out.append("illegal_marketplace")
+    if _MC_GROOM_MILD.search(folded):
+        out.append("grooming")
+    if _rx(r"\b(send|pošli|posli)\b.{0,25}\b(otp|kód z sms|jednorázov\w* kód|heslo|password)\b").search(folded):
+        out.append("cybercrime_fraud")
     return sorted(set(out))
 
 

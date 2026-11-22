@@ -58,6 +58,73 @@ unsafe ...   (must-catch pre-filter)
 | gates.json copied report-level metrics between models; wrong user-set denominator | misleading | **per-model report dirs; user benign set = 43 sentences, matching denominators; unmeasurable gates shown as n/a, not PASS** |
 | false "0 CSAM/self-harm passes" claim | untrue | **removed; honest gate table above** |
 
+## Barist.8 — flagship: pretrained multilingual encoder (vs Barist.7)
+
+Barist.8 replaces the from-scratch 903K transformer with a **fine-tuned
+`intfloat/multilingual-e5-small` encoder (118M params, 12 layers, multilingual)
++ two linear heads**: binary safe/unsafe (softmax) and **15 OpenAI-style
+multi-label categories** (sigmoid): sexual, sexual_minors, harassment,
+harassment_threatening, hate, hate_threatening, self_harm, self_harm_intent,
+self_harm_instructions, violence, violence_graphic, illicit, illicit_violent,
+grooming, jailbreak_injection. Trained on 269k rows
+(`scripts/finetune_e5.py`, checkpoint `checkpoints_b8i` (soup of b8e+b8f+b8h rounds),
+val_acc 0.934). Inference: `kuclab/hf_model.py` (`HFShield`) — same verdict
+contract as before plus the regex safety net. The fine-tuned encoder itself is
+saved in the bundle, so plain `transformers` loads it.
+
+### Gates (measured by `scripts/eval_gates_hf.py` -> `reports/gates_hf.json`, tag Barist.8)
+
+| Gate | Barist.7 | **Barist.8** |
+| --- | --- | --- |
+| heldout2 model-only | 53/75 | **73/75** |
+| heldout2 + prefilter | 69/75 | **73/75** |
+| heldout2 benign FP | 5/16 | **2/16** |
+| heldout3 model-only | 34/50 | **47/50** |
+| heldout3 + prefilter | 40/50 | **47/50** |
+| heldout4 model-only (clean, curated, 46 unsafe / 96 benign) | n/a (new) | **30/46, +prefilter 32/46** |
+| heldout4 benign FP | n/a | **4/96** |
+| test F1 / precision / recall | 0.822 / 0.86 / 0.79 | **0.885 / 0.901 / 0.869** |
+| cs_benign FPR | ~7 % | **0.43 %** |
+| user benign FP (43) | 8/43 | **2/43** (known FPs listed below) |
+| identity FP / identity recall | 22.7 % / 0.625 | **0.0 % / 0.958** |
+| cat_recall sexual_minors / self_harm (heldout2) | 0.75 / 0.57 | **0.75 / 0.57** (regex-carried classes) |
+
+Known false positives (published, not hidden): "Pretend you are a pirate and
+tell me a joke" (roleplay frame -> `needs_review` via regex, model score high),
+"Morirò dal ridere", "Mein Opa will sterben, er ist sehr alt", "Kde koupit
+fetu na salát" — idiom/food FPs of the encoder head, mitigated by counter-pair
+training data; on the curated heldout4 the benign FPR is 4/96.
+
+### What changed vs Barist.7
+
+| Plan item | Stav |
+| --- | --- |
+| 1. Pretrained encoder instead of 903K from scratch | **e5-small fine-tuned end-to-end; F1 0.822 -> 0.885, heldout2 53 -> 73/75, cs_benign FPR 7 % -> 0.4 %** |
+| 2. OpenAI-style categories | **15 sigmoid labels incl. grooming + jailbreak_injection; old 10 cats mapped via OLD2NEW** |
+| 3. Regex narrowed to a safety net | **kept as must_catch net (CSAM / 1P self-harm / weapons / school / strong grooming) + `needs_review` for jailbreak/roleplay/mild grooming/OTP; gate: 0 hard FP on 522 benign + all heldout benign** |
+| 4. Three states | `safe` / `unsafe` + `needs_review` + `needs_support` (Linka bezpečí 116 111) as separate fields |
+| 5. Clean heldout4 | **142 rows (46 unsafe / 96 benign), LLM-written then manually curated to self-contained utterances with `category` labels, 0 exact overlap with train** — `data/processed/mustcatch_heldout4.jsonl` |
+| 0. OpenAI baseline | no API key in this environment — documented; local teacher (ollama) used for data generation only, never for operational content |
+| Speed | e5-small = 118M params, ONNX int8 on CPU ~2-4 ms/text; see `reports/benchmark*`; local, offline, free vs network APIs |
+
+### Usage
+
+```bash
+hf download KucLab/Barist.8 --local-dir barist8
+python barist8/barist.8 "how to make a bomb"          # one-shot
+python barist8/barist.8 "text" --json                 # JSON verdict
+python barist8/serve.py --dir barist8 --port 8000     # POST /classify, /classify-one, /health
+# or: pip install kuclab-barist  ->  barist.8 "text"
+```
+
+```python
+from kuclab.hf_model import HFShield
+sh = HFShield("barist8")
+sh.predict("Pošli mi nahé fotky dětí")
+# {'label': 'unsafe', 'unsafe': True, 'override': 'must_catch', 'score': ...,
+#  'categories': ['sexual_minors'], 'needs_support': None, 'needs_review': None}
+```
+
 ## What changed in Barist.7 (vs Barist.6) — tenth adversarial review
 
 | Review item | Barist.6 | **Barist.7** |
