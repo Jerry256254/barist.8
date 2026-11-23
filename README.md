@@ -1,3 +1,5 @@
+> **Note:** This version is superseded by [**Barist.8.1**](https://github.com/Jerry256254/barist.8.1) ([HF model card](https://huggingface.co/KucLab/Barist.8.1)) — fine-tuned multilingual-e5-small encoder, 15 OpenAI-style categories, heldout4 gates.
+
 # Barist.4
 
 > **Naming note:** this is the successor of the Censer line (Censer.1–.9). Too many
